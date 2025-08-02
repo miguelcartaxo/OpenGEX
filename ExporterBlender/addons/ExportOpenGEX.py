@@ -19,16 +19,6 @@
 # 
 # =============================================================
 
-bl_info = {
-	"name": "OpenGEX (.ogex)",
-	"description": "Terathon Software OpenGEX Exporter",
-	"author": "Eric Lengyel",
-	"version": (2, 0, 0, 0),
-	"blender": (2, 80, 0),
-	"location": "File > Import-Export",
-	"wiki_url": "http://opengex.org/",
-	"category": "Import-Export"}
-
 
 import bpy
 import math
@@ -112,8 +102,8 @@ class ExportVertex:
 
 class OpenGexExporter(bpy.types.Operator, ExportHelper):
 	"""Export to OpenGEX format"""
-	bl_idname = "export_scene.ogex"
-	bl_label = "Export OpenGEX"
+	bl_idname = "export_scene_orig.ogex"
+	bl_label = "Export OpenGEX (original)"
 	filename_ext = ".ogex"
 
 	option_export_selection : bpy.props.BoolProperty(name = "Export Selection Only", description = "Export only selected objects", default = False)
@@ -585,7 +575,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 	def DeindexMesh(mesh, materialTable, shouldExportVertexColor = True):
 
 		mesh.calc_loop_triangles()
-		mesh.calc_normals_split()
+		#mesh.calc_normals_split() # removed in Blender 4.x
 		
 		# This function deindexes all vertex positions, colors, and texcoords.
 		# Three separate ExportVertex structures are created for each triangle.
@@ -1131,7 +1121,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 				for i in range(self.beginFrame, self.endFrame):
 					scene.frame_set(i)
 					if (math.fabs(parent.matrix.determinant()) > kExportEpsilon):
-						self.WriteMatrixFlat(parent.matrix.inverted() * poseBone.matrix)
+						self.WriteMatrixFlat(parent.matrix.inverted() @ poseBone.matrix)
 					else:
 						self.WriteMatrixFlat(poseBone.matrix)
 
@@ -1139,7 +1129,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
 				scene.frame_set(self.endFrame)
 				if (math.fabs(parent.matrix.determinant()) > kExportEpsilon):
-					self.WriteMatrixFlat(parent.matrix.inverted() * poseBone.matrix)
+					self.WriteMatrixFlat(parent.matrix.inverted() @ poseBone.matrix)
 				else:
 					self.WriteMatrixFlat(poseBone.matrix)
 
@@ -1658,14 +1648,14 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 		transform = bone.matrix_local.copy()
 		parentBone = bone.parent
 		if ((parentBone) and (math.fabs(parentBone.matrix_local.determinant()) > kExportEpsilon)):
-			transform = parentBone.matrix_local.inverted() * transform
+			transform = parentBone.matrix_local.inverted() @ transform
 
 		poseBone = armature.pose.bones.get(bone.name)
 		if (poseBone):
 			transform = poseBone.matrix.copy()
 			parentPoseBone = poseBone.parent
 			if ((parentPoseBone) and (math.fabs(parentPoseBone.matrix.determinant()) > kExportEpsilon)):
-				transform = parentPoseBone.matrix.inverted() * transform
+				transform = parentPoseBone.matrix.inverted() @ transform
 
 		self.IndentWrite(B"Transform")
 
@@ -2014,7 +2004,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 		self.IndentWrite(B"{\n", 0, True)
 
 		for i in range(boneCount):
-			self.WriteMatrixFlat(armature.matrix_world * boneArray[i].matrix_local)
+			self.WriteMatrixFlat(armature.matrix_world @ boneArray[i].matrix_local)
 			if (i < boneCount - 1):
 				self.Write(B",\n")
 
@@ -2733,10 +2723,10 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
 				# See chart on Table 2.1 of OGEX spec for details of how these map
 				self.ExportMaterialParam(bsdf, "Base Color", b"diffuse", flagsColorOrTexture )
-				self.ExportMaterialParam(bsdf, "Specular", b"specular", flagsColorOrTexture)
+				self.ExportMaterialParam(bsdf, "Specular Tint", b"specular", flagsColorOrTexture)
 				self.ExportMaterialParam(bsdf, "Roughness", b"roughness", flagsParamOrTexture)
 				self.ExportMaterialParam(bsdf, "Metallic", b"metalness", flagsParamOrTexture)
-				self.ExportMaterialParam(bsdf, "Emission", b"emission", flagsColorOrTexture )
+				self.ExportMaterialParam(bsdf, "Emission Color", b"emission", flagsColorOrTexture )
 				self.ExportMaterialParam(bsdf, "Alpha", b"opacity", flagsParamOrTexture, 1.0 )
 				self.ExportNormalMap( bsdf )
 
