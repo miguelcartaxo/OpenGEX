@@ -194,7 +194,8 @@ class OpenGexImporter(bpy.types.Operator, ImportHelper):
 					if self.use_custom_normals:
 						# Note: we store 'temp' normals in loops, since validate() may alter final mesh,
 						#       we can only set custom lnors *after* calling it.
-						mesh.create_normals_split()
+						mesh.attributes.new("temp_custom_normals", 'FLOAT_VECTOR', 'CORNER')
+						
 						normals_to_index = []
 						for index in indices_list:
 							normal = normals[index]
@@ -210,20 +211,15 @@ class OpenGexImporter(bpy.types.Operator, ImportHelper):
 					if ok_normals:
 						# Re-apply normals
 						clnors = array.array('f', [0.0] * (len(mesh.loops) * 3))
-						mesh.loops.foreach_get("normal", clnors)
-
-						#unique_smooth_groups = False
-						#if not unique_smooth_groups:
-						mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
+						mesh.attributes["temp_custom_normals"].data.foreach_get("vector", clnors)
 
 						mesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
-						mesh.use_auto_smooth = True
-						mesh.free_normals_split()
+						mesh.set_sharp_from_angle()
 					else:
 						mesh.calc_normals()
 
-					#if not unique_smooth_groups:
-					mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
+					if self.use_custom_normals:
+						mesh.attributes.remove(mesh.attributes["temp_custom_normals"])
 
 					mesh.update()
 
